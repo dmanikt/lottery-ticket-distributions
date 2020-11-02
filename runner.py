@@ -60,3 +60,42 @@ for epoch in range(1, epochs + 1):
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
+
+def make_mask(model):
+    global step
+    global mask
+
+    step = 0
+    for name, param in model.named_parameters():
+        if 'weight' in name:
+            step += 1
+    mask = [None] * step
+    step = 0
+    for name, param in model.named_parameters():
+        if 'weight' in name:
+            tensor = param.data.cpu().numpy()
+            mask[step] = np.ones_like(tensor)
+            step += 1
+    step = 0
+
+def prune_by_percentile(percent):
+    global mask
+    global step
+    global model
+
+    step = 0
+
+    for name, param in model.named_parameters():
+        if 'weight' in name:
+            tensor = param.data.cpu().numpy()
+            alive = tensor[np.nonzero(tensor]
+            percentile_value = np.percentile(abs(alive), percent)
+
+            weight_dev = param.device
+            new_mask = np.where(abs(tensor) < percentile_value, 0, mask[step])
+
+            param.data = torch.from_numpy(tensor * new_mask).to(weight_dev)
+            mask[step] = new_mask
+            step += 1
+    step = 0
+
