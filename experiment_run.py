@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import argparse
 import os
 import shutil
@@ -109,8 +110,7 @@ def train_fully(model, mask, num_epochs, train_loader, test_loader, optimizer, c
         if epoch != num_epochs and epoch % save_distribution_frequency == 0:
             save_distribution(model, '{}/{}_dist_{}.txt'.format(out_dir,header,epoch))
         
-        if epoch % 20 == 0:
-            dprint("\tFinished epoch {} with train_loss = {}, test_loss = {}, test_acc = {}".format(train_loss[epoch], test_loss[epoch], test_acc[epoch]))
+        dprint("\tFinished epoch {} with train_loss = {}, test_loss = {}, test_acc = {}".format(epoch,train_loss[epoch], test_loss[epoch], test_acc[epoch]))
 
     save_distribution(model, '{}/{}_dist_{}.txt'.format(out_dir,header,num_epochs))
 
@@ -184,13 +184,13 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='mnist')
     parser.add_argument('--arch_type', type=str, default='fc1')
     parser.add_argument('--pruning_s', type=float, default=.20)
-    parser.add_argument('--pruning_j', type=int, default=5)
+    parser.add_argument('--pruning_j', type=int, default=3) #TODO: make back to 5
     parser.add_argument('--pruning_n', type=int, nargs='+', default=[2,5,8,10])
     parser.add_argument('--num_trials', type=int, default=1)
     parser.add_argument('--save_dist_freq', type=int, default=75)
 
     args = parser.parse_args()
-
+    dprint("EXPERIMENT_RUN: BS = {} EPOCHS = {} DATA = {} ARCH = {} NUM_TRIALS = {}".format(args.batch_size, args.num_epochs, args.dataset, args.arch_type, args.num_trials))
     for trial_num in range(1, args.num_trials+1):
         main(args, trial_num)
 

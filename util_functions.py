@@ -1,6 +1,10 @@
 import numpy as np
 import torch
 
+def dprint(s, DEBUG=True):
+    if DEBUG:
+        print(s)
+
 def get_loss_and_acc(model, data_loader, criterion_sum):
     model.eval()
 
@@ -20,7 +24,7 @@ def get_loss_and_acc(model, data_loader, criterion_sum):
     acc = 100. * correct / len(data_loader.dataset)
     return loss, acc
 
-def train(model, mask, train_loader, optimizer, criterion, DEBUG=True):
+def train(model, mask, train_loader, optimizer, criterion, DEBUG=False):
     ZERO_VAL = 1e-5
     
     model.train()
@@ -59,7 +63,6 @@ def prune_by_percentile(model, mask, percent):
             percentile_value = np.percentile(abs(weights[mask[name]!=0]), percent)
 
             new_mask = np.where(abs(weights) < percentile_value, 0, mask[name])
-
             param.data = torch.from_numpy(weights * new_mask).to(param.device)
             mask[name] = new_mask
 
@@ -103,19 +106,25 @@ def create_pruned_models(model, model_trainer, pruning_s, pruning_j, pruning_n):
     mask = make_mask(model)
 
     initial_params = copy_params(model)
+    dprint("\tCreated initial model and mask")
     ret = {}
 
     ret[0] = (mask, initial_params)
     
     max_pruning = max(pruning_n)
     for n in range(1, max_pruning+1):
-        for _ in range(pruning_j):
+        dprint("\tStarting pruning n={}".format(n))
+        for j in range(1,pruning_j+1):
+            dprint("\t\tTraining epoch: {}".format(j))
             model_trainer(model, mask)
+        dprint("\tPruning the model")
         prune_by_percentile(model, mask, pruning_s)
         
         if n in pruning_n:
+            print("\tSaving pruned model")
             ret[n] = (mask, copy_params(model))
 
+        dprint("\tReinitializing masked model")
         reinitialize_model(model, initial_params, mask)
 
     return ret
