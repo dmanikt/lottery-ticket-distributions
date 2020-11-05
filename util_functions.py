@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from time import time
 
 def dprint(s, DEBUG=True):
     if DEBUG:
@@ -24,8 +25,9 @@ def get_loss_and_acc(model, data_loader, criterion_sum):
     acc = 100. * correct / len(data_loader.dataset)
     return loss, acc
 
-def train(model, mask, train_loader, optimizer, criterion, DEBUG=False):
+def train(model, mask, train_loader, optimizer, criterion):
     ZERO_VAL = 1e-5
+    t_start = time()
     
     model.train()
     device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
@@ -44,8 +46,7 @@ def train(model, mask, train_loader, optimizer, criterion, DEBUG=False):
                 p.grad.data = torch.from_numpy(grad * mask[name]).to(p.device)
         optimizer.step()
         
-        if DEBUG and batch_idx >= 100:
-            break
+    dprint("\t\t\tEpoch time: {}".format(time()-t_start))
 
 def make_mask(model):
     mask = {}
@@ -55,6 +56,12 @@ def make_mask(model):
             mask[name] = np.ones_like(tensor)
 
     return mask
+
+def permute_mask(mask):
+    new_mask = {}
+    for name in mask:
+        new_mask[name] = np.random.choice(mask[name].flatten(), size=mask[name].shape, replace=False)
+    return new_mask
 
 def prune_by_percentile(model, mask, percent):
     for name, param in model.named_parameters():
@@ -96,11 +103,11 @@ def reinitialize_model(model, weights, mask):
         if 'weight' in name:
             param.data = torch.from_numpy(weights[name] * mask[name]).to(param.device)
 
-def reinitialize_model_sampling(model, weights, mask):
+def reinitialize_model_sample(model, weights, mask):
     for name, param in model.named_parameters():
         if 'weight' in name:
             new_weights = np.random.choice(weights, size=param.data.cpu().numpy().shape)
-            param.data = torch.from_numpy(new_weights * mask[name]).to(param.device)
+            param.data = torch.from_numpy(new_weights * mask[name]).to(param.device).float()
 
 def create_pruned_models(model, model_trainer, pruning_s, pruning_j, pruning_n):
     mask = make_mask(model)

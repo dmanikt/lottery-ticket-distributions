@@ -2,6 +2,7 @@
 import argparse
 import os
 import shutil
+from time import time
 
 import numpy as np
 import torch
@@ -90,9 +91,13 @@ def save_distribution(model, out_file):
     with open(out_file, 'wb') as f:
         np.savetxt(f, extract_non_zero_params(copy_params(model)))
 
-def train_fully(model, mask, num_epochs, train_loader, test_loader, optimizer, criterion, criterion_sum, save_distribution_frequency, out_dir, header):
+def train_fully(model, mask, num_epochs, train_loader, test_loader, save_distribution_frequency, out_dir, header):
     dprint("\nTraining model")
 
+    criterion = nn.CrossEntropyLoss()
+    criterion_sum = nn.CrossEntropyLoss(reduction='sum')
+    optimizer = torch.optim.Adam(model.parameters(), weight_decay=1e-4)
+    
     train_loss = np.zeros(num_epochs+1)
     test_loss = np.zeros(num_epochs+1)
     test_acc = np.zeros(num_epochs+1)
@@ -139,7 +144,7 @@ def main(args, trial_num):
     pruned_models = create_pruned_models(model, model_pruning_trainer, 100*args.pruning_s, args.pruning_j, args.pruning_n)
     dprint("Created pruned models")
 
-    experiment_runner = lambda model, mask, out_dir, header: train_fully(model, mask, args.num_epochs, train_loader, test_loader, optimizer, criterion, criterion_sum, args.save_dist_freq, out_dir, header)
+    experiment_runner = lambda model, mask, out_dir, header: train_fully(model, mask, args.num_epochs, train_loader, test_loader, args.save_dist_freq, out_dir, header)
 
     mask_0, theta_0 = pruned_models[0]
     D_0 = extract_non_zero_params(theta_0)
@@ -164,35 +169,39 @@ def main(args, trial_num):
         experiment_runner(model, mask_n, out_dir, '{}_pruned_Dn'.format(n))
 
         #pruned, D_0
-        reinitialize_model_sample(model, D_0, mask_n)
-        dprint("\nReinitialized with D_0, pruned. starting run")
-        experiment_runner(model, mask_n, out_dir, '{}_pruned_D0'.format(n))
+        #reinitialize_model_sample(model, D_0, mask_n)
+        #dprint("\nReinitialized with D_0, pruned. starting run")
+        #experiment_runner(model, mask_n, out_dir, '{}_pruned_D0'.format(n))
 
         #full, D_n
-        reinitialize_model_sample(model, D_n, mask_0)
-        dprint("\nReinitialized with D_n, full. starting run")
-        experiment_runner(model, mask_0, out_dir, '{}_full_Dn'.format(n))
+        #reinitialize_model_sample(model, D_n, mask_0)
+        #dprint("\nReinitialized with D_n, full. starting run")
+        #experiment_runner(model, mask_0, out_dir, '{}_full_Dn'.format(n))
 
-
-
+        #random_pruned, D_n
+        random_mask_n = permute_mask(mask_n)
+        reinitialize_model_sample(model, D_n, random_mask_n)
+        dprint("\nReinitialized with D_n, random_pruned. Starting run")
+        experiment_runner(model, random_mask_n, out_dir, '{}_randompruned_Dn'.format(n))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', type=int, default=256)
-    parser.add_argument('--num_epochs', type=int, default=300)
+    parser.add_argument('--num_epochs', type=int, default=150)
     parser.add_argument('--dataset', type=str, default='mnist')
     parser.add_argument('--arch_type', type=str, default='fc1')
     parser.add_argument('--pruning_s', type=float, default=.20)
-    parser.add_argument('--pruning_j', type=int, default=3) #TODO: make back to 5
-    parser.add_argument('--pruning_n', type=int, nargs='+', default=[2,5,8,10])
-    parser.add_argument('--num_trials', type=int, default=1)
-    parser.add_argument('--save_dist_freq', type=int, default=75)
+    parser.add_argument('--pruning_j', type=int, default=5)
+    parser.add_argument('--pruning_n', type=int, nargs='+', default=[6,10])
+    parser.add_argument('--num_trials', type=int, default=5)
+    parser.add_argument('--save_dist_freq', type=int, default=50)
 
     args = parser.parse_args()
-    dprint("EXPERIMENT_RUN: BS = {} EPOCHS = {} DATA = {} ARCH = {} NUM_TRIALS = {}".format(args.batch_size, args.num_epochs, args.dataset, args.arch_type, args.num_trials))
+    dprint("EXPERIMENT_RUN: BS = {} EPOCHS = {} DATA = {} ARCH = {} NUM_TRIALS = {}\n".format(args.batch_size, args.num_epochs, args.dataset, args.arch_type, args.num_trials))
     for trial_num in range(1, args.num_trials+1):
+        dprint("STARTING TRIAL: {}".format(trial_num))
         main(args, trial_num)
-
+    dprint("FINISHED EXPERIMENT")
 
 
