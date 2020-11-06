@@ -46,7 +46,7 @@ def train(model, mask, train_loader, optimizer, criterion):
                 p.grad.data = torch.from_numpy(grad * mask[name]).to(p.device)
         optimizer.step()
         
-    dprint("\t\t\tEpoch time: {}".format(time()-t_start))
+    dprint("\t\tEpoch time: {}".format(time()-t_start))
 
 def make_mask(model):
     mask = {}
