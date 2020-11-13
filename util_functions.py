@@ -109,6 +109,12 @@ def reinitialize_model_sample(model, weights, mask):
             new_weights = np.random.choice(weights, size=param.data.cpu().numpy().shape)
             param.data = torch.from_numpy(new_weights * mask[name]).to(param.device).float()
 
+def copy_mask(mask):
+    new_mask = {}
+    for k in mask:
+        new_mask[k] = mask[k].copy()
+    return new_mask
+
 def create_pruned_models(model, model_trainer, pruning_s, pruning_j, pruning_n):
     mask = make_mask(model)
 
@@ -116,7 +122,7 @@ def create_pruned_models(model, model_trainer, pruning_s, pruning_j, pruning_n):
     dprint("\tCreated initial model and mask")
     ret = {}
 
-    ret[0] = (mask, initial_params)
+    ret[0] = (copy_mask(mask), initial_params)
     
     max_pruning = max(pruning_n)
     for n in range(1, max_pruning+1):
@@ -129,7 +135,7 @@ def create_pruned_models(model, model_trainer, pruning_s, pruning_j, pruning_n):
         
         if n in pruning_n:
             print("\tSaving pruned model")
-            ret[n] = (mask, copy_params(model))
+            ret[n] = (copy(mask), copy_params(model))
 
         dprint("\tReinitializing masked model")
         reinitialize_model(model, initial_params, mask)
